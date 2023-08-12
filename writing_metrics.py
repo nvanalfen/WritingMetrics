@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import seaborn as sns
 import os
 from datetime import datetime
 import matplotlib.pyplot as plt
@@ -107,6 +108,20 @@ def net_cumulative_words_written(df, project_columns, essential_columns, subgoal
 
     return net
 
+# Get the number of words written on each weekday
+def weekday_words_written(df, project_columns):
+    projects = [ proj for proj in project_columns if proj in df.columns ]
+    value = pd.DataFrame(df[ projects ])
+    if "Total" in df.columns:
+        value["Total"] = df["Total"]
+    weekdays = get_weekday(value.index)
+    weekdays = weekday_to_string(weekdays)
+    value["Weekday"] = weekdays
+
+    value = value.groupby("Weekday").sum()
+
+    return value
+
 #####################################################################################################################################################
 ##### METRICS #######################################################################################################################################
 #####################################################################################################################################################
@@ -147,6 +162,7 @@ def non_cumulative_metrics(df, project_columns, essential_columns, subgoal_colum
     else:
         values = net_words_written(df, project_columns, essential_columns, subgoal_columns, total_only=total_only)
     
+    # If we just want to look at the values for a particular weekday, do it now (after the words/day have been calculated)
     if not weekday is None:
         values = select_weekday(values, weekday, date_format)
         df = select_weekday(df, weekday, date_format)
@@ -176,20 +192,6 @@ def non_cumulative_metrics(df, project_columns, essential_columns, subgoal_colum
         metrics["Positive Days"] = (values > 0).sum(axis=0)
 
     return metrics
-
-# Get the number of words written on each weekday
-def weekday_words_written(df, project_columns):
-    projects = [ proj for proj in project_columns if proj in df.columns ]
-    value = pd.DataFrame(df[ projects ])
-    if "Total" in df.columns:
-        value["Total"] = df["Total"]
-    weekdays = get_weekday(value.index)
-    weekdays = weekday_to_string(weekdays)
-    value["Weekday"] = weekdays
-
-    value = value.groupby("Weekday").sum()
-
-    return value
 
 #####################################################################################################################################################
 ##### PLOTTING FUNCTIONS ############################################################################################################################
@@ -229,6 +231,17 @@ def plot_progress(values, columns=None, omit_goals=False, project_columns=None, 
     plt.ylabel("Words Written")
     plt.show()
 
+def histogram_words_written(df, project_columns, bins=10, columns=None):
+    if columns is None:
+        columns = project_columns + ["Total"]
+        columns = [ col for col in columns if col in df.columns ]
+    #df.plot(kind="hist", bins=bins, y=columns, alpha=0.5)
+    print(df[columns].melt())
+    sns.histplot(data=df[columns].melt(), multiple="dodge", x="value", shrink=0.75, bins=bins, hue="variable")
+    plt.xlabel("Words Written")
+    plt.ylabel("Frequency")
+    plt.show()
+
 #####################################################################################################################################################
 ##### MAIN ##########################################################################################################################################
 #####################################################################################################################################################
@@ -240,7 +253,7 @@ def plot_progress(values, columns=None, omit_goals=False, project_columns=None, 
 
 df = read_word_count_file(word_count_file)
 standard = words_written(df, project_columns, essential_columns, subgoal_columns)
-#net_words = net_words_written(df, project_columns, essential_columns, subgoal_columns)
+net_words = net_words_written(df, project_columns, essential_columns, subgoal_columns)
 
 #print(weekday_words_written( net_words_written(df) ))
 #plot_weekday_words_written( weekday_words_written( words_written(df) ) )
@@ -253,6 +266,8 @@ print(net_words_written(df, project_columns, essential_columns, subgoal_columns)
 #print(cumulative_words_written(df, project_columns, essential_columns, subgoal_columns)[:5] )
 #print(">>>>> Net Cumulative")
 #print(net_cumulative_words_written(df, project_columns, essential_columns, subgoal_columns)[:5] )
+
+#histogram_words_written(net_words, project_columns, bins=10)
 
 print(">>>>> Metrics")
 standard_metrics, net_metrics, standard_week_metrics, net_week_metrics = all_non_cumulative_metrics(df[1:25], project_columns, essential_columns, subgoal_columns, date_format, columns=None)
